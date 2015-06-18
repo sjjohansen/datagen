@@ -1,0 +1,64 @@
+This script generates a simple CSV with the following schema:
+
+id: a unique id starting at 0 or the value of the start_id argument
+username: a username which is selected from a randomly generated list
+timestamp: a timestamp in Unix epoch format, see:
+https://en.wikipedia.org/wiki/Unix_time
+
+So as an example:
+
+userts.py 1433858400 1434376800 -u 50000 -e 50000000 > outfile.txt
+
+This will:
+- generate 50,000 random usernames
+- generate 50,000,000 sequential events starting with eventid = 0
+- for each event select a random user from the 50,000 and a random timestamp between Jun 10 00:00:00 2015 & Tue Jun 16 00:00:00 2015
+
+To convert a epoch timestamp to a date:
+
+$ perl -e 'print scalar localtime(1433858400), "\n"'
+Wed Jun 10 00:00:00 2015
+
+For usage with Hadoop it's probably better to split and compress these files.
+Here we're doing 10 files with 5,000,000 lines each:
+
+split -l 5000000 outfile.txt users_
+gzip users_*
+
+# loading these into Hive:
+
+[cloudera@quickstart hive]$ hadoop fs -ls /user/cloudera/events_raw/batch*/*
+-rw-r--r--   1 cloudera cloudera   66449358 2015-06-17 21:49 /user/cloudera/events_raw/batch_1/users_aa.gz
+-rw-r--r--   1 cloudera cloudera   66402818 2015-06-17 21:49 /user/cloudera/events_raw/batch_1/users_ab.gz
+-rw-r--r--   1 cloudera cloudera   66097050 2015-06-17 21:49 /user/cloudera/events_raw/batch_1/users_ac.gz
+-rw-r--r--   1 cloudera cloudera   66099959 2015-06-17 21:50 /user/cloudera/events_raw/batch_2/users_ad.gz
+-rw-r--r--   1 cloudera cloudera   66098807 2015-06-17 21:50 /user/cloudera/events_raw/batch_2/users_ae.gz
+-rw-r--r--   1 cloudera cloudera   66097185 2015-06-17 21:50 /user/cloudera/events_raw/batch_3/users_af.gz
+-rw-r--r--   1 cloudera cloudera   66099046 2015-06-17 21:50 /user/cloudera/events_raw/batch_4/users_ag.gz
+-rw-r--r--   1 cloudera cloudera   66099233 2015-06-17 21:50 /user/cloudera/events_raw/batch_4/users_ah.gz
+-rw-r--r--   1 cloudera cloudera   66098599 2015-06-17 21:50 /user/cloudera/events_raw/batch_4/users_ai.gz
+-rw-r--r--   1 cloudera cloudera   66097651 2015-06-17 21:50 /user/cloudera/events_raw/batch_4/users_aj.gz
+
+cd hive/
+
+First create the database/schema:
+
+hive -f create_events_db.hql
+
+Now the external tables that map to the raw files:
+
+hive --hiveconf batch_id=1 -f create_staging_batch_table.hql
+hive --hiveconf batch_id=2 -f create_staging_batch_table.hql
+hive --hiveconf batch_id=3 -f create_staging_batch_table.hql
+hive --hiveconf batch_id=4 -f create_staging_batch_table.hql
+
+Now the Hive warehouse table in ORC format:
+
+hive -f create_events_table.hql
+
+Load into the warehouse table:
+hive --hiveconf batch_id=1 -f load_events.hql
+hive --hiveconf batch_id=2 -f load_events.hql
+hive --hiveconf batch_id=3 -f load_events.hql
+hive --hiveconf batch_id=4 -f load_events.hql
+
