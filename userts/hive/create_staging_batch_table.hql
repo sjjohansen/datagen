@@ -7,4 +7,4 @@ ROW FORMAT DELIMITED
 FIELDS TERMINATED BY ','
 ESCAPED BY '\\'
 STORED AS TEXTFILE
-LOCATION '/user/${system:user.name}/events_raw/batch_${hiveconf:batch_id}';
+LOCATION '/user/${hiveconf:owner}/events_raw/batch_${hiveconf:batch_id}';

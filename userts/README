@@ -45,6 +45,11 @@ First create the database/schema:
 
 hive -f create_events_db.hql
 
+-- using beeline --
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ -f create_events_table.hql
+
 Now the external tables that map to the raw files:
 
 hive --hiveconf batch_id=1 -f create_staging_batch_table.hql
@@ -52,9 +57,40 @@ hive --hiveconf batch_id=2 -f create_staging_batch_table.hql
 hive --hiveconf batch_id=3 -f create_staging_batch_table.hql
 hive --hiveconf batch_id=4 -f create_staging_batch_table.hql
 
+-- using beeline --
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ --hiveconf batch_id=1 \
+ --hiveconf owner=sjj \
+  -f create_staging_batch_table.hql
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ --hiveconf batch_id=2 \
+ --hiveconf owner=sjj \
+  -f create_staging_batch_table.hql
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ --hiveconf batch_id=3 \
+ --hiveconf owner=sjj \
+  -f create_staging_batch_table.hql
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ --hiveconf batch_id=4 \
+ --hiveconf owner=sjj \
+  -f create_staging_batch_table.hql
+
 Now the Hive warehouse table in ORC format:
 
 hive -f create_events_table.hql
+
+--
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+  -n sjj -p TESTandTEST01
+  -f create_events_table.hql
 
 Load into the warehouse table:
 hive --hiveconf batch_id=1 -f load_events.hql
@@ -62,3 +98,47 @@ hive --hiveconf batch_id=2 -f load_events.hql
 hive --hiveconf batch_id=3 -f load_events.hql
 hive --hiveconf batch_id=4 -f load_events.hql
 
+-- beeline
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" -n sjj -p TESTandTEST01 --hiveconf batch_id=1 --hiveconf hive.execution.engine=tez -f load_events.hql
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" -n sjj -p TESTandTEST01 --hiveconf batch_id=2 --hiveconf hive.execution.engine=tez -f load_events.hql
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" -n sjj -p TESTandTEST01 --hiveconf batch_id=3 --hiveconf hive.execution.engine=tez -f load_events.hql
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" -n sjj -p TESTandTEST01 --hiveconf batch_id=4 --hiveconf hive.execution.engine=tez -f load_events.hql
+
+# create a view
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ -f counts_view.hql
+
+Testing with pig:
+
+pig -x tez pig/counts.pig
+
+Testing with HBase:
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ -f hbase/hbase_ext.hql
+
+beeline -u "jdbc:hive2://phdmaster01.phd.hadoop:10000/" \
+ -n sjj -p TESTandTEST01 \
+ -f hbase/load_hbase.hql
+
+echo "scan 'event_counts'" | hbase shell | tail
+
+Testing Oozie:
+
+hdfs dfs -mkdir -p oozie
+cd oozie
+hdfs dfs -rm -f -r oozie/*;hdfs dfs -put counts_to_csv oozie
+oozie job -oozie http://phdmaster03.phd.hadoop:11000/oozie \
+ -config counts_to_csv/job.properties \
+ -run
+
+[sjj@phdclient01 oozie]$ hdfs dfs -cat count_output/000000_0 | wc -l
+50000
+
+
+
+ 
