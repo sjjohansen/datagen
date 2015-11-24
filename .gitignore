@@ -6,4 +6,4 @@ target/
 log/
 .settings/
 *.swp
-*/events_raw/
+events_raw/
